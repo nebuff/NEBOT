@@ -1,0 +1,16 @@
+# Local Go toolchain downloaded for development
+.tools/
+
+# Build output
+/nebot
+/dist/
+
+# Local secrets
+.env
+.env.local
+.env.*.local
+
+# SQLite artifacts from the Python bot
+DATA/*.db
+DATA/*.db-shm
+DATA/*.db-wal

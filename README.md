@@ -1,5 +1,7 @@
 # NEBOT
 
+> **Go port in progress.** The target implementation lives in `cmd/` and `internal/`; see [PORT_TO_GO.md](PORT_TO_GO.md) for the migration plan. The Python bot in `SRC/` remains the reference implementation until feature parity is reached.
+
 ## Prerequisite Baselines
 
 1. **Operating System:** Linux (Debian/Ubuntu recommended) or macOS
