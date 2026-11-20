@@ -41,9 +41,25 @@ type ComponentProvider interface {
 	Components() []Route
 }
 
+// MemberJoinProvider is implemented by modules that handle guild member joins.
+// Join providers run in registration order; returning handled=true stops dispatch.
+type MemberJoinProvider interface {
+	HandleMemberJoin(ctx context.Context, session *dg.Session, member *dg.GuildMemberAdd) (handled bool, err error)
+}
+
 // ModalProvider is implemented by modules that handle modal submissions.
 type ModalProvider interface {
 	Modals() []Route
+}
+
+// MemberLeaveProvider is implemented by modules that handle guild member leaves.
+type MemberLeaveProvider interface {
+	HandleMemberLeave(ctx context.Context, session *dg.Session, member *dg.GuildMemberRemove) (handled bool, err error)
+}
+
+// VoiceStateProvider is implemented by modules that observe voice state changes.
+type VoiceStateProvider interface {
+	HandleVoiceStateUpdate(ctx context.Context, session *dg.Session, update *dg.VoiceStateUpdate) (handled bool, err error)
 }
 
 // Base provides no-op implementations for modules that do not use every hook.

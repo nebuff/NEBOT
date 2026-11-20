@@ -75,6 +75,22 @@ func (c *Context) ReplyEmbedEphemeral(embed *dg.MessageEmbed) error {
 	})
 }
 
+// ReplyEmbedWithComponents sends an embed with interactive components, either
+// publicly or ephemerally.
+func (c *Context) ReplyEmbedWithComponents(embed *dg.MessageEmbed, components []dg.MessageComponent, ephemeral bool) error {
+	if embed == nil {
+		return errors.New("reply embed is nil")
+	}
+	data := &dg.InteractionResponseData{
+		Embeds:     []*dg.MessageEmbed{embed},
+		Components: components,
+	}
+	if ephemeral {
+		data.Flags = dg.MessageFlagsEphemeral
+	}
+	return c.respond(dg.InteractionResponseChannelMessageWithSource, data)
+}
+
 // Update edits the message that owns a button/select/modal interaction.
 func (c *Context) Update(content string, embed *dg.MessageEmbed, components []dg.MessageComponent) error {
 	data := &dg.InteractionResponseData{
@@ -85,6 +101,19 @@ func (c *Context) Update(content string, embed *dg.MessageEmbed, components []dg
 		data.Embeds = []*dg.MessageEmbed{embed}
 	}
 	return c.respond(dg.InteractionResponseUpdateMessage, data)
+}
+
+// ShowModal opens a modal form for the user. The caller's next interaction is
+// routed by the modal's custom ID.
+func (c *Context) ShowModal(customID, title string, components []dg.MessageComponent) error {
+	if customID == "" || title == "" {
+		return errors.New("modal custom_id and title are required")
+	}
+	return c.respond(dg.InteractionResponseModal, &dg.InteractionResponseData{
+		CustomID:   customID,
+		Title:      title,
+		Components: components,
+	})
 }
 
 // Defer acknowledges an interaction while a slower operation completes.

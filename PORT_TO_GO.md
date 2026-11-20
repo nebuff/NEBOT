@@ -1,6 +1,6 @@
 # Porting NEBOT to Go
 
-**Status:** proposal + M0 scaffold + M1 core (guild config, auth, grok, nebuff)
+**Status:** proposal + M0 scaffold + M1 core + M2 auto-roller/admin dashboard + analytics + self roles
 **Reference implementation:** `SRC/` — Python 3.11, discord.py 2.x, wavelink, psycopg2/SQLite
 **Target:** one statically linked Go binary, PostgreSQL, Lavalink v4
 
@@ -50,12 +50,37 @@ plurality are the highest-risk behaviour to match.
 - First feature modules: `@nebuff` and `@grok` (message → config → reply path).
 - Tests for config default/round-trip behaviour, cache semantics, auth, and both modules.
 
-Config writes are currently full-row upserts; targeted per-field updates arrive with the dashboards.
+Config writes are currently full-row upserts; targeted per-field updates can follow once more dashboards exist.
+
+### M2 auto-roller + first dashboard (this change)
+
+- `/admin` opens an ephemeral module manager; the Auto-Roller entry is wired, the other modules are status-only until their ports land.
+- Auto-Roller dashboard: toggle, clear roles, and a native role multi-select, all stateless and routed by `custom_id`.
+- Member-join provider: grants configured roles after filtering them through the bot's role hierarchy, skipping missing/already-held roles, and logging per-role API failures.
+- Setting changes save one guild row and emit the Python-compatible audit-log embed when `global_log_channel_id` is configured.
+- Tests cover role planning, dashboard construction, and member-join dispatch/interception.
+
+### Analytics (this change)
+
+- Message velocity, member churn, and non-bot voice concurrency are collected through message, member-join, member-leave, and voice-state hooks.
+- Writes are aggregated per guild in memory and flushed every five seconds, so a message no longer reloads and rewrites the entire `server_analytics` table the way Python does. Only dirty guild rows are written; failed rows stay dirty for retry.
+- The persisted `messages` / `churn` / `voice` JSON remains compatible with the Python-created schema, and 30-day pruning matches `clean_old_records`.
+- `/analytics` produces the 24-hour or 7-day report for moderators; `/admin` now has a Server Analytics entry with enable/disable, excluded-channel configuration, and historical-data clearing.
+- Tests cover aggregation, batching, retention, clearing, JSON compatibility, dashboard construction, report formatting, and voice counting.
+
+### Self-assignable roles (this change)
+
+- `/admin` now has a Self Roles entry. The dashboard supports module enable/disable, group creation via modal, group mode cycling, single/multi limits, embed title/description/color, role add/remove, button-color styling, deletion, and channel deployment.
+- `self_roles_groups` remains the Python JSON shape. Missing Python defaults (`auto_take_away`, `allow_take_off`, role style) are applied on read, so existing rows load without a migration.
+- Deployed role menus are stateless: buttons route through compact group-keyed `custom_id`s and keep working after restart. A `self_role:<guild>:<group>:<role>` compatibility route accepts menus deployed by the Python bot.
+- Role requirements, single-mode `require_one`/`auto_take_away`, multi-mode min/max, `allow_take_off`, and per-role requirements are enforced by a pure planner with table-driven tests. The bot checks role existence and hierarchy/permission failures before replying with the Python-compatible action message.
+- Tests cover JSON defaults/round-trip, mode and requirement decisions, custom-ID parsing, all dashboards, the deployed menu, and the admin entry.
 
 ### What this does **not** do yet
 
-- No `/config` slash command or dashboards (M1/M5).
-- No automod, shell, music, plurality, games, or role-management modules yet (M2+).
+- No `/config` read-only overview yet; `/admin` currently exposes Auto-Roller, Server Analytics, and Self Roles (more modules in M2+).
+- No `/dash` member analytics view yet; reports are available through `/analytics` and `/admin`.
+- No automod, shell, music, plurality, games, or bulk-role management yet (M2+).
 - No Lavalink client yet (M6).
 - No CI workflow yet.
 

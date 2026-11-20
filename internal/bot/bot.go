@@ -24,6 +24,9 @@ import (
 const (
 	interactionTimeout = 20 * time.Second
 	messageTimeout     = 30 * time.Second
+	memberJoinTimeout  = 20 * time.Second
+	memberLeaveTimeout = 20 * time.Second
+	voiceStateTimeout  = 20 * time.Second
 	readyTimeout       = 30 * time.Second
 )
 
@@ -82,6 +85,9 @@ func New(cfg config.Config, log *slog.Logger, st *store.Store) (*Bot, error) {
 	session.AddHandler(b.onReady)
 	session.AddHandler(b.onInteractionCreate)
 	session.AddHandler(b.onMessageCreate)
+	session.AddHandler(b.onGuildMemberAdd)
+	session.AddHandler(b.onGuildMemberRemove)
+	session.AddHandler(b.onVoiceStateUpdate)
 
 	return b, nil
 }
@@ -327,6 +333,84 @@ func (b *Bot) onMessageCreate(session *dg.Session, message *dg.MessageCreate) {
 		handled, err := mod.HandleMessage(ctx, session, message)
 		if err != nil {
 			b.log.Error("message module failed", "module", mod.Name(), "err", err)
+			continue
+		}
+		if handled {
+			return
+		}
+	}
+}
+
+func (b *Bot) onGuildMemberAdd(session *dg.Session, event *dg.GuildMemberAdd) {
+	defer b.recoverPanic("member join")
+
+	if event == nil || event.Member == nil || event.User == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), memberJoinTimeout)
+	defer cancel()
+
+	for _, mod := range b.modules {
+		provider, ok := mod.(module.MemberJoinProvider)
+		if !ok {
+			continue
+		}
+		handled, err := provider.HandleMemberJoin(ctx, session, event)
+		if err != nil {
+			b.log.Error("member join module failed", "module", mod.Name(), "err", err)
+			continue
+		}
+		if handled {
+			return
+		}
+	}
+}
+
+func (b *Bot) onGuildMemberRemove(session *dg.Session, event *dg.GuildMemberRemove) {
+	defer b.recoverPanic("member leave")
+
+	if event == nil || event.Member == nil || event.User == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), memberLeaveTimeout)
+	defer cancel()
+
+	for _, mod := range b.modules {
+		provider, ok := mod.(module.MemberLeaveProvider)
+		if !ok {
+			continue
+		}
+		handled, err := provider.HandleMemberLeave(ctx, session, event)
+		if err != nil {
+			b.log.Error("member leave module failed", "module", mod.Name(), "err", err)
+			continue
+		}
+		if handled {
+			return
+		}
+	}
+}
+
+func (b *Bot) onVoiceStateUpdate(session *dg.Session, event *dg.VoiceStateUpdate) {
+	defer b.recoverPanic("voice state")
+
+	if event == nil || event.VoiceState == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), voiceStateTimeout)
+	defer cancel()
+
+	for _, mod := range b.modules {
+		provider, ok := mod.(module.VoiceStateProvider)
+		if !ok {
+			continue
+		}
+		handled, err := provider.HandleVoiceStateUpdate(ctx, session, event)
+		if err != nil {
+			b.log.Error("voice state module failed", "module", mod.Name(), "err", err)
 			continue
 		}
 		if handled {
